@@ -1,5 +1,23 @@
-dhest <-
-function(x, alpha, gamma, mu, beta, sigma, rho, dT,
+#'@name dhest
+#'@title Stationary Distribution of Heston Model Log-Return Differences
+#'@description these will roughly be centered at alpha*dT \cr
+#'             requires Fourier inversion of the characteristic function, ie. numerical \cr
+#'             complex integration.  currently done by grid method. \cr
+#'             LConst allows fewer exp evaluations if alpha is held constant. \cr
+#'@param x
+#'@param alpha
+#'@param gamma
+#'@param mu
+#'@param beta
+#'@param sigma
+#'@param rho
+#'@param dT
+#'@param inter
+#'@param n
+#'@param LConst
+#'@return numeric
+#'@export
+dhest <- function(x, alpha, gamma, mu, beta, sigma, rho, dT,
                   inter = c(-5e3, 5e3), n = 1e3, LConst, debug = FALSE) {
   if(missing(mu)) mu <- (beta + sigma^2/2)/(2*gamma)
   y <- x - alpha*dT

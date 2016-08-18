@@ -1,5 +1,39 @@
-cop.par <-
-function(X, dens.x, dens.y, Rho, mean, sd, from, to, n, ...,
+#'@name cop.par
+#'@title Parameter Estimation of a Gaussian Copula Distribution
+#'@param x a matrix
+#'@param dens.x a matrix or a numeric or a list
+#'@param dens.y a matrix or a numeric or a list
+#'@param Rho
+#'@param mean
+#'@param sd standard deviation
+#'@param from
+#'@param to
+#'@param n
+#'@param ...
+#'@param zero.dens boolean (\code{FALSE} by default)
+#'@param sd.infl a real (1/5 by default)
+#'@param debug a boolean (\code{FALSE} by default) if set to \code{TRUE}, will cause the function to open a browser mid-call
+#'@return a list containing the estimated gaussian-copula distribution parameters: \code{dens.x}, \code{dx}, \code{rx}, \code{dens.y}, \code{ldens.y}, \code{Dens.y}, \code{Rho}, \code{mean}, \code{sd}.
+#'@examples
+#'
+#'# arbitrary correlation matrix
+#'f <- function(n) {
+#'  cov2cor(crossprod(matrix(rnorm(n^2), nrow = n, ncol = n)))
+#'}
+#'
+#'theta <- c(alpha = .1, gamma = 5, beta = .8, sigma = .6, rho = -.7)
+#'Y0 <- c(X = log(100), Z = .1)
+#'
+#'# define the prior on parameters and the first missing data point.
+#'norm.prior <- c(theta, Y0[2]) # this will be the mean, and half of it will be the standard deviations
+#'norm.prior <- list(Mu = norm.prior,
+#'                   V = diag(abs(norm.prior)/2) %*% f(length(norm.prior)) %*% diag(abs(norm.prior)/2))
+#'
+#'# gaussian copula prior will be essentially identical
+#'psim <- rmvnorm(1e5, mean = norm.prior$Mu*1.1, sigma = norm.prior$V*2)
+#'gcop.prior <- cop.par(X = psim, n = 512)
+#'@export
+cop.par <- function(X, dens.x, dens.y, Rho, mean, sd, from, to, n, ...,
                     zero.dens = FALSE, sd.infl = 1/5, debug = FALSE) {
   if(!missing(X)) {
     X <- as.matrix(X)
@@ -16,7 +50,7 @@ function(X, dens.x, dens.y, Rho, mean, sd, from, to, n, ...,
                    function(x) qqnorm(x, plot.it = FALSE)$x)
       Rho <- cor(tmp)
     }
-    if(missing(dens.x) | missing(dens.y)) {      
+    if(missing(dens.x) | missing(dens.y)) {
       if(!missing(from)) {
         from <- rep(from, len = d)
         to <- rep(to, len = d)

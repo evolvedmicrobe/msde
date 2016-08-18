@@ -1,5 +1,49 @@
-sde.sim <-
-function(model,
+#'@name sde.sim
+#'@title Simulation
+#'@description Runs a simulation using the supplied model, data and parameters.
+#'@param model an object of the sde.model class generated using \code{sde.make.model}
+#'@param init.data A matrix containing data for the model.
+#'                 Must have as many columns as the model has dimensions.
+#'                 If \code{init.data} has only 1 row, that row will be repeated for each of the \code{nreps} Markov chains, otherwise
+#'                 Must have as many rows as \code{nreps}
+#'@param params A matrix containing parameters for the model
+#'              Must have as many columns as the model has parameters
+#'              If \code{params} has only 1 row, that row will be repeated for each of the \code{nreps} Markov chains, otherwise
+#'              Must have as many rows as \code{nreps}
+#'@param dt A double. The ratio of \code{dt/dt.sim} determines
+#'                    how many intermediate steps there will be between each stored value
+#'@param dt.sim A double The ratio of \code{dt/dt.sim} determines
+#'                       how many intermediate steps there will be between each stored value
+#'@param N An integer that determines how many data values will be stored for each Markov chain
+#'@param burn An integer representing the number of data values to burn for each Markov chain (default \code{0})
+#'            OR a double 0 < burn < 1 representing the number of data values to burn for each chain as a fraction of N
+#'@param nreps An integer giving the number of Markov chains to use
+#'@param max.bad.draws An integer giving the maximum number of times that invalid data can be encountered in the simulation (default \code{5e3})
+#'@param verbose A boolean that determines how much text is printed out by this function (default \code{TRUE})
+#'@param debug a boolean (\code{FALSE} by default) if set to \code{TRUE}, will cause the function to open a browser mid-call
+#'@return a list containing: data, params, dt, dt.sim, nbad
+#'@examples
+#'# Create the model
+#'hest.model <- sde.make.model(list = hestList)
+#'
+#'theta <- c(alpha = .1, gamma = 5, beta = .8, sigma = .6, rho = -.7) # parameters
+#'Y0 <- c(X = log(100), Z = .1) # initial values
+#'
+#'# simulate data
+#'N <- 100
+#'burn <- 0
+#'dT <- 1/252
+#'
+#'hsim <- sde.sim(model = hest.model, init.data = Y0, params = theta, dt = dT, dt.sim = dT/100,
+#'                N = N, burn = burn, nreps = 1)
+#'
+#'
+#'# plot
+#'par(mfrow = c(1,2))
+#'plot(hsim$data[,"X"], type = "l", xlab = "Time (days)", ylab = expression(X[t]))
+#'plot(hsim$data[,"Z"]^2/4, type = "l", xlab = "Time (days)", ylab = expression(V[t]))
+#'@export
+sde.sim <- function(model,
                     init.data, params, dt, dt.sim,
                     N, burn = 0, nreps = 1,
                     max.bad.draws = 5e3, verbose = TRUE,

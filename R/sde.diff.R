@@ -1,5 +1,28 @@
-sde.diff <-
-function(model, x, theta) {
+#'@name sde.diff
+#'@title Diffusion Function
+#'@description Applies the diffusion function for \code{model} to \code{x} using \code{theta}
+#'@param model An object of the sde.model class generated using \code{sde.make.model}
+#'@param x A matrix of data
+#'@param theta A matrix of parameters
+#'@return A matrix containing the result of the diffusion function
+#'@examples
+#'# Create the model
+#'hest.model <- sde.make.model(list = hestList, model.name = "hest")
+#'
+#'theta <- c(alpha = .1, gamma = 5, beta = .8, sigma = .6, rho = -.7)
+#'Y0 <- c(X = log(100), Z = .1)
+#'
+#'# simulate data
+#'N <- 10
+#'burn <- 10
+#'dT <- 1/252
+#'
+#'hsim <- sde.sim(model = hest.model, init.data = Y0, params = theta, dt = dT, dt.sim = dT/100,
+#'                N = N, burn = burn, nreps = 1)
+#'
+#'df <- sde.diff(model = hest.model, x = hsim$data, theta = theta)
+#'@export
+sde.diff <- function(model, x, theta) {
   if(class(model) != "sde.model")
     stop("Expecting object of class sde.model.  Use sde.make.model to create.")
   # model constants

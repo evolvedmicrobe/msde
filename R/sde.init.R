@@ -1,5 +1,37 @@
-sde.init <-
-function(data, dt, k, m, par.index, params, debug = FALSE) {
+#'@name sde.init
+#'@title Posterior Sampler Initialization
+#'@description  initialize posterior sampler for a given resolution level k, \cr
+#'              or m missing data points per interval, i.e. m = 2^k-1. \cr
+#'              currently only supports constant interobservation times.
+#'@param data An array of data
+#'@param dt A vector of Delta-t. Must have \code{length(dt) == 1 || length(dt) == nrow(data)-1}
+#'@param k An integer representing a resolution level (only used if \code{m} is missing)
+#'@param m An integerrepresenting the number of missing data points per interval
+#'@param par.index An integer
+#'@param params A vector of parameters that, if provided, will be included in the output of this function.
+#'@param debug a boolean (FALSE by default) if set to \code{TRUE}, will cause the function to open a browser mid-call
+#'@return a list containing: data, dt, par.index, params (only if \code{params} was passed to sde.init)
+#'@examples
+#'# Create the model
+#'hest.model <- sde.make.model(list = hestList, model.name = "hest")
+#'
+#'theta <- c(alpha = .1, gamma = 5, beta = .8, sigma = .6, rho = -.7)
+#'Y0 <- c(X = log(100), Z = .1)
+#'
+#'# simulate data
+#'N <- 10
+#'burn <- 10
+#'dT <- 1/252
+#'
+#'hsim <- sde.sim(model = hest.model, init.data = Y0, params = theta, dt = dT, dt.sim = dT/100,
+#'                N = N, burn = burn, nreps = 1)
+#'
+#'k <- 1
+#'par.index <- 1
+#'
+#'init <- sde.init(data = hsim$data, dt = dT, k = k, par.index = par.index, params = theta)
+#'@export
+sde.init <- function(data, dt, k, m, par.index, params, debug = FALSE) {
   nobs <- nrow(data)
   ndims <- ncol(data)
   if(missing(m)) m <- 2^k-1
