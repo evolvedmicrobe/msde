@@ -1,0 +1,409 @@
+\documentclass{article}
+%\VignetteIndexEntry{Introduction to msde}
+%\VignetteEngine{knitr::knitr}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{bm}
+\usepackage[sc]{mathpazo}
+\usepackage[T1]{fontenc}
+\usepackage{xcolor}
+\usepackage{geometry}
+\geometry{verbose,tmargin=2.5cm,bmargin=2.5cm,lmargin=2.5cm,rmargin=2.5cm}
+\usepackage[unicode=true,bookmarks=false,colorlinks=true,citecolor=blue,linkcolor=blue,urlcolor=blue,pdfstartview={FitH}]{hyperref}
+\usepackage{natbib}
+\usepackage{enumitem}
+\setlist[enumerate]{leftmargin=0pt,wide=0pt}
+\setlist[itemize]{leftmargin=0pt,wide=0pt}
+\usepackage{parskip}
+\usepackage{stats-v3}
+\usepackage{code-v1}
+\renewcommand{\baselinestretch}{1.2}
+\numberwithin{equation}{section}
+\numberwithin{figure}{section}
+\numberwithin{table}{section}
+
+\newcommand{\Y}{Y}
+\newcommand{\prog}[1]{\textsf{#1}}
+\newcommand{\pkg}[1]{\textbf{#1}}
+\newcommand{\code}[1]{\texttt{#1}}
+
+<<setup, include=FALSE, cache=FALSE>>=
+library(knitr)
+knit_hooks$restore()
+opts_chunk$set(fig.path = 'figure/msde-', out.width = '1.00\\textwidth')
+options(replace.assign = TRUE)
+# opts_chunk$set(highlight=FALSE, prompt=FALSE, comment='##')
+opts_chunk$set(highlight=FALSE, prompt=FALSE, comment = '')
+#output.dir <- "C:/Users/Jerome/Documents/latex/msde"
+output.dir <- NULL
+opts_knit$set(out.format="listings", base.dir = output.dir)
+#opts_knit$set(out.format="listings")
+set_header(framed="", highlight="")
+hook.i = function(x, options) paste(c("\\begin{Rinput}", x,
+  "\\end{Rinput}", ""), collapse = "\n")
+hook.s = function(x, options) paste("\\begin{Routput}\n", x,
+  "\\end{Routput}\n", sep = "")
+hook.m = function(x, options) paste("\\begin{CPPoutput}\n", x,
+  "\\end{CPPoutput}\n", sep = "")
+hook.o = function(x, options) hook.s(x, options)
+knit_hooks$set(source = hook.i, output = hook.o, warning = hook.s,
+               message = hook.m, error = hook.s,
+               plot = hook_plot_tex)
+@
+
+\begin{document}
+
+\title{Stochastic volatility modeling with \textbf{msde}}
+
+\date{\today}
+\author{Martin Lysy and Trevor Kitt}
+
+\maketitle
+
+\begin{abstract}
+\noindent\pkg{msde} is an \prog{R} package for simulation and Bayesian inference with multivariate stochastic differential equation (SDE) models.  This vignette demonstrates the basic functionalities of the package as applied to stochastic volatility modeling of financial assets.
+\end{abstract}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Introduction}
+
+\pkg{msde} is an \prog{R} package containing several functions for simulation and Bayesian inference with stochastic differential equation (SDE) models.  A $d$-dimensional stochastic process $\Y_t$ follows an SDE if it can be written as
+\begin{equation}\label{eq:sde}
+\ud \Y_t = \Lambda(\Y_t, \t) \ud t + \Psi(\Y_t, \t) \ud B_t^{(d)},
+\end{equation}
+where $B_t^{(d)} = (\rv [1t] B {dt})$ are $d$ iid standard Brownian motions.  SDE models have received considerable attention in both the scientific and statistical literature~\citep[see][for references to dozens of examples]{kou.etal12, beskos.etal13}.  The \pkg{msde} package allows useRs to quickly and easily create objects of class \code{sde.model}, which have methods for simulation and Bayesian inference written in \prog{C++}.  The default Bayesian inference algorithm is a posterior Markov Chain Monte Carlo (MCMC) Gibbs sampler with minimal tuning parameters.  Several tools are also available for rapid approximate Bayesian inference as described in~\cite{lysy12}.
+
+\subsection{Heston's Model}
+
+The following example serves to illustrate some of the functionalities of \pkg{msde}.  Heston's stochastic volatility model~\citep{heston93} is commonly used in finance for the pricing of options.  The SDE for Heston's model is $\Y_t = (S_t, V_t)$ with
+\begin{equation}\label{eq:heston}
+\begin{split}
+\ud S_t & = \a S_t \ud t + V_t^{1/2} S_t \ud B_{St} \\
+\ud V_t & = -\g(V_t - \mu) \ud t + \s V_t^{1/2} \ud B_{Vt},
+\end{split}
+\end{equation}
+where $S_t$ is the asset price, $V_t$ is its volatility, and $\cor(B_{St}, B_{Vt})  = \rho$.  In practice, $V_t$ is often taken to be a latent process, such that the model parameters $\t = (\a, \g, \mu, \s, \rho)$ must be inferred from discretely-realized observations of the asset price, $\bm S = (\rv [t_0] S {t_N})$.%Thus, a Bayesian posterior distribution is
+%\[
+%p(\t \| S) \propto L(\t \| S) \pi(\t)
+%\]
+%for given prior $\pi(\t)$.
+
+\subsection{\prog{C++} Configuration}
+
+The bulk of \pkg{msde}'s computations are executed directly in \prog{C++}, which must be correctly interfaced with \prog{R} for the package to work.  In order to do this under Windows:
+\begin{enumerate}
+  \item Start by installing the latest version of \href{http://cran.r-project.org/}{\prog{R}} and \href{http://cran.r-project.org/bin/windows/Rtools/}{\prog{Rtools}}.  For the latter, use the default settings and allow it to make all necessary updates to the system files (e.g., put checks in both boxes).
+  %\item Go to \emph{Control Panel > System > Advanced system settings} and select \emph{Environment Variables}.  At the end of the system variable \emph{Path}, add the location of the \prog{R} binary files.  On my computer with a 64-bit version of Windows, this is:
+%\begin{cmd}
+%;C:\Program Files\R\R-3.0.0\bin\x64
+%\end{cmd}
+  \item Open \prog{R} and load the \pkg{Rcpp} package by~\cite{eddelbuettel.francois11}. Run the \code{fibonacci} example found in the documentation for \code{cppFunction}.  If the \prog{C++} code compiles without errors then \pkg{msde} is properly configured and ready to use.
+\end{enumerate}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section{Simulating Data from Heston's Model}
+
+\pkg{msde} package provides compiled \prog{C++} functions for simulation and inference for multivariate SDEs of the form~\eqref{eq:sde} which hinge on a discrete time approximation of the continuous process $\Y_t$.  That is, for a short time interval $\d t$, the dynamics of $\Y_t$ may be approximated by the Euler scheme~\citep{maruyama55}
+\begin{equation}\label{eq:euler}
+\Y_{t + \d t} \| \Y_t, \t \approx \N_d\Big(\Y_t + \Lambda(\Y_t, \t) \d t, \Psi(\Y_t, \t)\Psi(\Y_t, \t)' \d t\Big).
+\end{equation}
+
+The following code shows how to simulate data from Heston's model.  The first step is to improve the accuracy of the discrete-time approximation by reparametrizing the model to $X_t = \log(S_t)$ and $Z_t = 2 V_t^{1/2}$.  Using It\=o's formula,~\eqref{eq:heston} becomes
+\begin{align*}
+\ud X_t & = (\alpha - \tfrac 1 8 Z_t^2)\ud t + \tfrac 1 2 Z_t \ud B_{Xt} \\
+\ud Z_t & = (\b/Z_t - \tfrac 1 2\g Z_t) \ud t + \s \ud B_{Zt}
+\end{align*}
+with $\b = 2\g\mu - \s^2/2$ and $\cor(B_{Xt}, B_{Zt}) = \rho$.  The ``drift'' and ``diffusion'' functions for Heston's model are thus:
+\[
+\Lambda(Y_t, \t) = \begin{bmatrix} \a - \tfrac 1 8 Z_t^2 \\ \b/Z_t - \tfrac 1 2 \g Z_t \end{bmatrix}, \qquad \Psi(Y_t, \t) = \begin{bmatrix} \tfrac 1 2 Z_t & 0 \\ \s \rho & \s \sqrt{1 - \rho^2} \end{bmatrix},
+\]
+where $Y_t = (X_t,Z_t)$ and $\t = (\a, \g, \b, \s, \rho)$.
+
+\subsection{Creating an \code{sde.model} object}
+
+Next, we must create a \prog{C++} library of functions specific to Heston's model.  This is accomplished with the \code{sde.make.model} function:
+<<>>=
+require(msde)
+args(sde.make.model)
+@
+\noindent Some of the arguments to this function are:
+\begin{itemize}
+%  \item \code{model.name}: a short identifier for the model -- for instance, \code{hest}.
+	\item \code{ndims}: the number of dimensions of the multivariate SDE.  For Heston's model this is $d = 2$.
+	\item \code{nparams}: the number of model parameters, which for Heston's model is $p = 5$.
+\end{itemize}
+
+The following arguments are \prog{C++} functions that are passed from the \prog{R} code as character strings.
+
+\textbf{WARNING:} the name, return type, and argument list of these functions must be match {\color{red}exactly} for \pkg{msde} to work.
+\begin{itemize}
+	\item \code{sdeDr}: the drift function for the model.  For Heston's model this is coded as
+	\begin{cpp}
+void sdeDr(double dr[], double x[], double t, double params[]) {
+	dr[0] = (params[0] - .125 * x[1]*x[1]) * t; // x
+	dr[1] = (params[2]/x[1] - .5 * params[1]*x[1]) * t; // z
+  return;
+}
+  \end{cpp}
+	That is, \code{sdeDr} sets its first argument $\code{dr}=\Lambda(\code{x}, \code{params}) \cdot \code{t}$.
+	\item \code{sdeDf}: the diffusion function for the SDE model.  This must be passed as the upper Cholesky factor of the infinitesimal variance matrix $\Psi(\Y_t, \t) \Psi(Y_t, \t)'$.  For Heston's this is
+	\begin{cpp}
+void sdeDf(double df[], double x[], double sqrtT, double params[]) {
+	df[0] = .5 * x[1] * sqrtT;
+	df[2] = params[3] * sqrtT;
+	df[3] = sqrt(1.0-params[4]*params[4]) * df[2];
+	df[2] *= params[4];
+	return;
+}
+  \end{cpp}
+	Thus, \code{sdeDf} has the effect of setting $\code{df}=\Psi(\code{x}, \code{params})' \cdot \code{sqrtT}$.  The array \code{df} is of length $d^2$ and represents a matrix in upper triangular form stacked by column\footnote{For some SDEs it is easier to define the diffusion function as a variance matrix $V(\Y_t, \t) = \Psi(\Y_t, \t)' \Psi(\Y_t, \t)$.  In this case it is possible to use the \pkg{msde} function \code{chol\_decomp} inside of \code{sdeDf}.}.
+	\item \code{isValidData}: a function returning \code{TRUE} or \code{FALSE}, depending on whether a given value of $Y_t$ is within the SDE's support.  For Heston's model, this function allows $X_t \in \mathbb R$ but places the restriction $Z_t > 0$.
+	\begin{cpp}
+int isValidData(double x[]) {
+  return(x[1] > 0.0);
+}
+  \end{cpp}
+        \item \code{isValidParams}: similarly, a function returning \code{TRUE} or \code{FALSE} which defines the valid parameter region.  For Heston's model, we have $\g, \s > 0$ and $-1 < \rho < 1$.  Moreover, it can be guaranteed that the volatility $V_t$ never reaches 0 by imposing the further restriction $\b > \s^2/2$.
+\begin{cpp}
+int isValidParams(double params[]) {
+  int isValid;
+  isValid = (params[1] > 0) && (params[3] > 0); // gamma, sigma > 0
+  isValid = isValid && (-1.0 < params[4]) && (1.0 > params[4]); // -1 < rho < 1
+  isValid = isValid && (params[2] > 0.5 * params[3] * params[3]); // beta > 0.5 sigma^2
+  return(isValid);
+}
+\end{cpp}
+\end{itemize}
+The arguments to \code{sde.make.model} can be passed invidually or as a list.  The latter approach is used to create the \code{sde.model} object below:
+<<>>=
+names(hestList)
+hest.model <- sde.make.model(list = hestList, cpp.out = TRUE)
+names(hest.model)
+class(hest.model)
+@
+%Setting the \code{Rcpp = TRUE} flag automatically compiles the \prog{C++} code using \pkg{Rcpp}.  This should be suitable for most purposes but advanced users seeking greater control over the management of shared function libraries can compile the \prog{C++} code manually by setting \code{Rcpp = FALSE}.
+Setting \code{cpp.out = TRUE} returns the \prog{C++} code itself as one of the list elements of the \code{sde.model} object:
+<<>>=
+message(paste(hest.model$cpp.code[1:7], collapse = "\n"))
+@
+
+\subsection{Simulation}
+
+Upon creating the \code{sde.model} object, \pkg{msde} produces and compiles a \prog{C++} function to simulate data from Heston's model using the Euler approximation~\eqref{eq:euler}.  The following \prog{R} code simulates data from Heston's model with $\d t_{\tx{obs}} = 1/252$ -- the financial convention for daily observations -- using a very fine Euler approximation ($\d t_{\tx{Euler}} = \d t_{\tx{obs}}/100$).  The model parameters are taken from the estimates of~\cite{ait-sahalia.kimmel07} fitted to S\&P 500 daily returns between 1990-2003.
+<<trace, fig.height=3.5, fig.cap='Simulated data from Heston\'s model.'>>=
+# model parameters
+alpha <- .1
+gamma <- 5.07
+mu <- .05
+sigma <- .48
+rho <- -.77
+beta <- 2*gamma*mu - sigma^2/2
+theta <- c(alpha = alpha, gamma = gamma, beta = beta, sigma = sigma, rho = rho)
+Y0 <- c(X = log(100), Z = 2*sqrt(mu))
+dT <- 1/252 # financial convention for one observation per day
+
+# simulate data
+ndays <- 1e5
+hest.sim <- sde.sim(model = hest.model, init.data = Y0, params = theta,
+                    dt = dT, dt.sim = dT/1e2, N = ndays, burn = 100)
+
+# plot it
+par(mfrow = c(1,2), mar = c(4, 4.5, .5, .5))
+plot(hest.sim$data[1:500,"X"], xlab = "Week", ylab = expression(X[t]), type = "l")
+plot(hest.sim$data[1:500,"Z"], xlab = "Week", ylab = expression(Z[t]), type = "l")
+@
+
+Unlike many SDEs, Heston's model admits several analytic results.  For one, the stationary distribution of the volatility $V_t = Z_t^2/4$ is
+\[
+V_t \sim \textrm{Gamma}\left(\frac{2\g\mu}{\s^2}, \frac{\s^2}{2\g}\right).
+\]
+Moreover, the log-returns $X_{n+1} - X_n$ have a stationary distribution for which the exact expression is given by~\cite{dragulescu.yakovenko02}.  Both of these theoretial densities are compared to the empirical histograms produced by \code{sde.sim} in Figure~\ref{fig:theo-emp}.
+<<'theo-emp', fig.height=3.5, fig.cap='Theoretical vs. empirical volatility and log-return distributions.'>>=
+# empirical log returns
+rsim <- diff(hest.sim$data[,"X"]) # empirical log returns
+# theoretical log return distribution
+rseq <- seq(min(rsim), max(rsim), len = 100)
+rpdf <- dhest(x = rseq, alpha = alpha, gamma = gamma, mu = mu,
+              sigma = sigma, rho = rho, dT = dT, n = 1e4)
+
+# empirical volatility
+vsim <- hest.sim$data[,"Z"]^2/4
+# theoretical distribution
+vseq <- seq(min(vsim), max(vsim), len = 100)
+vpdf <- dgamma(x = vseq, shape = 2*gamma*mu/sigma^2, scale = sigma^2/(2*gamma))
+
+# plot
+par(mfrow = c(1,2), mar = c(4, 4.5, .5, .5))
+hist(rsim, freq = FALSE, breaks = 100, xlab = "Log-Returns", main = NA)
+lines(rseq, rpdf, col = "red")
+hist(vsim, freq = FALSE, breaks = 100, xlab = "Volatility", main = NA)
+lines(vseq, vpdf, col = "red")
+@
+
+\section{A Basic Algorithm for Bayesian SDE Inference}
+
+The likelihood function for discrete observations $\bm \Y = (\rv [t_0] {\Y} {t_N})$ of the SDE~\eqref{eq:sde} is
+\begin{equation}\label{eq:obslik}
+L(\t \| \bm \Y) \propto \prod_{n=0}^{N-1} p(\Y_{t_{n+1}} \| \Y_{t_{n}}, \t).
+\end{equation}
+For most SDEs (including Heston's model), the transition density $p(\Y_t \| \Y_0, \t)$ is the solution to a partial differential equation~\citep[e.g.,][]{oksendal03} which cannot be expressed in closed form.  A popular approach to this problem is by way of the following Bayesian data augmentation scheme\footnote{For the particular form of Heston's model, more efficient data augmentation schemes have been described~\citep[e.g.][]{kalogeropoulos.etal10, beskos.etal13}.}~\citep[e.g.,][]{jones03, eraker01, elerian.etal01, golightly.wilkinson05, kou.etal12}.
+
+Assume that the observations $\bm Y$ are evenly spaced such that $t_n = n \cdot \d t$.  For any integer $m \ge 0$, let $\d t_m = \d t/m$ and $t_{m,n} = n \cdot \d t_m$.  Then we can view $\Y_{(m)} = (\rv [t_{m,0}] {\Y} {t_{m, Nm}})$ as complete data.  The observed data $\Y_\tx{obs} = \bm \Y$ is given by $\Y_{t_n} = \Y_{t_{m,nm}}$), and the missing data is $\Y_\tx{miss} = \Y_{(m)} \setminus \Y_\tx{obs}$.  The Euler approximation for the complete data likelihood is
+\begin{equation}\label{eq:complik}
+\hat L(\t \| \Y_{(m)}) \propto \prod_{n=0}^{Nm-1} \exp\left\{-\frac 1 2 \left(\Y_{t_{m,n+1}} - \hat Y_{t_{m,n}}(\t)\right)' \hat V_{t_{m,n}}(\t)^{-1} \left(\Y_{t_{m,n+1}} - \hat Y_{t_{m,n}}(\t)\right) - \frac 1 2 \log \abs{\hat V_{t_{m,n}}(\t)} \right\},
+%\hat L(\t \| \Y_{(m)}) \propto \prod_{i=1}^{Nm} \hat p(\Y_{t_{m,n}} \| \Y_{t_{m,n-1}}, \t),
+\end{equation}
+where
+%\[
+%\hat p(\Y_{t+\d t} \| \Y_{t}, \t) = \exp\left\{-\frac 1 2 \left(\Y_{t+\d t} - \hat Y_t(\t)\right)' \hat V_t(\t)^{-1} \left(\Y_{t+\d t} - \hat Y_t(\t)\right) - \frac 1 2 \log \abs{\hat V_t(\t)} \right\}
+%\]
+%is the normal density induced by the Euler approximation~\eqref{eq:euler}, with
+\[
+\hat \Y_t(\t) = \Y_t + \Lambda(\Y_t, \t) \d t \quad \textrm{and} \quad \hat V_t(\t) = \Psi(\Y_t, \t) \Psi(\Y_t, \t)' \d t.
+\]
+Bayesian inference for $\t$ can then be achieved by specifying a prior $\pi(\t)$ and sampling from the joint posterior distribution
+\begin{equation}\label{eq:fullpost}
+\hat p_m(\t, \Y_\tx{miss} \| \bm \Y) \propto \hat L(\t \| \Y_{(m)}) \pi(\t).
+\end{equation}
+As $m \to \infty$, the marginal parameter distribution
+\[
+\hat p_m(\t \| \bm \Y) = \int \hat p_m(\t, \Y_\tx{miss} \| \bm \Y) \ud \Y_\tx{miss}
+\]
+converges to the true SDE posterior $p(\t \| \bm \Y) \propto L(\t \| \bm \Y) \pi(\t)$.
+
+\subsection{Implementation with \pkg{msde}}
+
+Markov Chain Monte Carlo (MCMC) sampling from $\hat p_m(\t, \Y_\tx{miss} \| \bm \Y)$ in~\eqref{eq:fullpost} is achieved with the function \code{sde.post}:
+<<>>=
+args(sde.post)
+@
+The \pkg{msde} package supports several built-in priors which are specified via the \code{prior} argument to \code{sde.post}.
+\begin{enumerate}
+  \item The flat prior $\pi(\t) \propto 1$ is obtained by setting \code{prior = NULL}.
+  \item A normal prior with mean \code{Mu} and variance \code{V} is obtained letting \code{prior} be a list with elements \code{Mu} and \code{V}.
+  \item A Gaussian Copula prior~\citep[e.g.,][]{li00} is obtained by letting \code{prior} be an object of class \code{gcop}, which is typically returned by a call to the function \code{cop.par}.
+\end{enumerate}
+It is also possible for the user to specify a custom prior in \prog{C++} code as discussed in Appendix~\ref{app:custprior}.  Each prior above is subject to the parameter restrictions set by \code{isValidParams}.
+
+Once the prior $\pi(\t)$ has been set, \code{sde.post} implements a basic Gibbs sampler which updates all random variables $(\t, \Y_\tx{miss})$ one at a time, conditioned on all the others:
+\begin{itemize}
+  \item Conditional updates of $\Y_{\tx{miss},n}$ are obtained by the Metropolis-Within-Gibbs algorithm of~\cite{eraker01}.  These updates require no tuning.
+  \item Conditional updates of each parameter $\t_i$ are also by Metropolis-Within-Gibbs, but in this case vanilla random walk proposals are employed.  The tuning parameters are \code{rw.jump.sd}, a numeric vector of the standard deviations of the (independent) normal proposals for each parameter.
+\end{itemize}
+
+The following \prog{R} code runs the MCMC sampler with $\bm \Y = (\rv [0] {\Y} {500})$ and no missing data (i.e., $m = 0$).
+<<'post0', fig.height=3.5, fig.cap='Parameter densities from $\\hat p_0(\\t \\| \\Y)$.'>>=
+N <- 501
+# initialize the sampler
+m <- 0
+init0 <- sde.init(data = hest.sim$data[1:N,], dt = hest.sim$dt, m = m, par.index = 2,
+                  params = hest.sim$params)
+# ncol(init0$data) == length(init0$par.index) == N
+sapply(init0, head)
+
+# posterior inference
+nsamples <- 2e4
+data.out.ind <- 1e3 # number of missing data iteration to keep
+rw.jump.sd <- c(.2, 2, .2, .1, .1)
+hpost0 <- sde.post(model = hest.model, init = init0, prior = NULL,
+                   nsamples = nsamples, data.out.ind = data.out.ind, rw.jump.sd = rw.jump.sd)
+
+# plot the posterior densities
+theta.names <- expression(alpha, gamma, beta, sigma, rho)
+par(mfrow = c(2,3), mar = c(4, 4.5, .5, .5))
+for(ii in 1:5) {
+  hist(hpost0$params[,ii], breaks = 100, freq = FALSE,
+       xlab = theta.names[ii], main = "")
+  abline(v = theta[ii], col = "red")
+}
+legend(x = "topright", legend = expression(hat(p)[0](theta*" | "*Y), theta), fill = c("black", "red"))
+@
+
+\subsection{Inference with latent volatility}
+
+The following \prog{R} code runs the MCMC sampler with $m = 2$ missing data points between each observation.  Morever, in practice the volatility $V_t$ is often taken as a latent process and therefore is also considered to be missing data.  That is, the observed data is $\bm X = (\rv [0] X {500})$.  This information can be passed to \code{sde.post} with the \code{par.index} argument:
+<<>>=
+m <- 2
+init2 <- sde.init(data = hest.sim$data[1:N,], dt = hest.sim$dt, m = m, par.index = 1,
+                      params = hest.sim$params)
+# ncol(init2$data) == length(init2$par.index) == (N-1)*m+1
+sapply(init2, head)
+@
+Setting \code{par.index = 1} indicates that only the first of the two components of $\Y_t = (X_t, Z_t)$ -- in this case, $X_t$ -- is observed, while the other component(s) -- in this case, $Z_t$ -- is(are) missing.  By passing \code{m = 2} to \code{sde.init}, the two missing data points between each observations are completely unobserved, thus having \code{par.index} values of 0.
+
+The targeted posterior distribution in this case is $\hat p_2(\t, Y_\tx{miss} \| \bm X)$.  We have set \code{init2\$par.index[1] = 1}, which means that the first volatility $Z_{20}$ is missing and has to be sampled as well.  We do this by random walk Metropolis-Within-Gibbs, just like each of the components of $\t$.  The parameter \code{rw.jump.sd} now has six components, with the last one corresponding to the jump size of $Z_{2,0}$.
+<<'post02', fig.height=3.5, fig.cap='Parameter densities from $\\hat p_0(\\t \\| \\Y)$ and $\\hat p_2(\\t \\| X)$.'>>=
+rw.jump.sd <- c(.2, 2, .2, .1, .1, .1)
+hpost2 <- sde.post(model = hest.model, init = init2, prior = NULL,
+                   nsamples = nsamples, data.out.ind = data.out.ind, rw.jump.sd = rw.jump.sd)
+
+# plot the posterior densities
+approx.names <- expression(hat(p)[0](theta*" | "*Y), hat(p)[2](theta*" | "*X))
+clrs <- c("black", "blue")
+par(mfrow = c(2,3), mar = c(4, 4.5, .5, .5))
+for(ii in 1:5) {
+  dens0 <- density(hpost0$params[,ii])
+  dens2 <- density(hpost2$params[,ii])
+  plot(0, type = "n", xlim = range(dens0$x, dens2$x), ylim = range(dens0$y, dens2$y),
+       xlab = theta.names[ii], ylab = "Density")
+  lines(dens0$x, dens0$y, col = clrs[1])
+  lines(dens2$x, dens2$y, col = clrs[2])
+  abline(v = theta[ii], col = "red")
+}
+legend(x = "topright", legend = c(approx.names, expression(theta)), fill = c(clrs, "red"))
+@
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\appendix
+
+\section{Implementation of a custom prior}\label{app:custprior}
+
+All models will have access to the flat, normal, and Gaussian copula prior fuctions. If none of these are sufficient, it is possible to define a custom prior function and pass it to \code{sde.make.model} when compiling a model.  This is done with the \code{logCustomPrior} argument.  In \prog{C++}, the custom prior function takes the form
+\begin{cpp}
+double CustomPrior::logPrior(double params[], double x[]) {
+  //prior function code
+}
+\end{cpp}
+The \code{CustomPrior} class defines a variable \code{customParams}, which can be used to access parameters passed to the prior. When called with \code{prior} argument which does not conform with the default types (flat, normal, Gaussian copula), the contents of \code{prior} are concatenated into a vector of doubles which become the contents of \code{customParams}. The parameters must be accessed by their numeric index, and they must be of type \code{double}.
+
+For example, suppose that for Heston's model we wish to code the prior $\pi(\t)$ given by
+\begin{align*}
+& \sigma^2 \sim \tx{Inv-Gamma}(a_1, b_1), \\
+& (rho+1)/2 \| \sigma \sim \tx{Beta}(a_2, b_2), \\
+& \pi(\a, \g, \b \| \sigma, \rho) \sim \propto 1. \\
+\end{align*}
+Then the \code{logCustomPrior} argument of \code{sde.make.model} is given by the character string:
+<<echo=2>>=
+hestLogPrior <- "double CustomPrior::logPrior(double params[], double x[]) {
+  // parameter identification
+  double a1 = customParams[0];
+  double b1 = customParams[1];
+  double a2 = customParams[2];
+  double b2 = customParams[3];
+  double lp = -(a1-2.0) * log(params[3]) - b1 / (params[3]*params[3]);
+  lp += (a2-1.0) * log(0.5*params[4] + 0.5) + (b2-1.0) * log(0.5 - 0.5*params[4]);
+  return(lp);
+}"
+message(paste(hestLogPrior, collapse = "\n"))
+@
+Additionally, useRs can specify custom prior argument names to \code{sde.post}:
+<<>>=
+hest.model <- sde.make.model(list = hestList,
+                             logCustomPrior = hestLogPrior,
+                             custom.names = c("a1", "b1", "a2", "b2"), cpp.out = TRUE, debug = FALSE)
+@
+If the \code{custom.names} don't correspond to those in the \code{prior} argument to \code{sde.post}, an error is returned.
+<<>>=
+### not run: this code returns an error
+# hpost0 <- sde.post(model = hest.model, init = init0, prior = c(a1 = 1, c1 = 2),
+#                    nsamples = 5)
+### end not run
+@
+
+\bibliographystyle{stdref}
+\bibliography{msde-ref}
+
+\end{document}
