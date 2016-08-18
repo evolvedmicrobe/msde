@@ -77,19 +77,23 @@ void zmvn(double z[], double x[], double mean[], double cholSd[], int n, int nMa
 // i.e., z = sd^{-1} * (x - mean)
 // NOTE: sd = lowTri(cholSD'), i.e. only upper triangular entries of cholSD are used
 double lmvn(double x[], double z[], double mean[], double cholSd[], int n) {
-  int ii, jj, colI;
-  double tmpSum;
-  for(ii = 0; ii < n; ii++) z[ii] = x[ii] - mean[ii];
+  double tmpSum2 = 0.0;
+  double tmpSum3 = 0.0;
+  double resi, tmpSum, val;
+  int ii, colI, jj;
   // forward substitution
+  colI = 0;
   for(ii = 0; ii < n; ii++) {
-    colI = n*ii;
+    resi = x[ii] - mean[ii];
     tmpSum = 0.0;
     for(jj = 0; jj < ii; jj++) tmpSum += cholSd[colI + jj] * z[jj];
-    z[ii] = (z[ii] - tmpSum)/cholSd[colI + ii];
+    val = (resi - tmpSum) / cholSd[colI + ii];
+    tmpSum3 += log(cholSd[colI + ii]);
+    z[ii] = val;
+    tmpSum2 += (val * val);
+    colI += n;
   }
-  tmpSum = 0.0;
-  for(ii = 0; ii < n; ii++) tmpSum += z[ii] * z[ii];
-  tmpSum *= 0.5;
-  for(ii = 0; ii < n; ii++) tmpSum += log(cholSd[n*ii + ii]);
-  return(-tmpSum);
+  tmpSum2 *= 0.5;
+  tmpSum2 += tmpSum3;
+  return(-tmpSum2);
 }

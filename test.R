@@ -1,14 +1,20 @@
 #--- basic test that old version produces same output as new version ------------
 
-require(msde)
-require(msde.devel)
+require(msde) # stable version
+require(msde2) # development version
 
 # make models
 
-hest.model <- msde::sde.make.model(list = msde::hestList)
-hest.model2 <- msde.devel::sde.make.model(list = msde.devel::hestList)
+Sys.setenv(CPPFLAGS = "")
+hest.model <- msde::sde.make.model(list = msde::hestList,
+                                   verbose = TRUE, rebuild = TRUE)
 
-identical(hest.model, hest.model2)
+# this fails to make it to Rcpp...
+Sys.setenv(CPPFLAGS = "-ffast-math -O3")
+hest.model2 <- msde2::sde.make.model(list = msde2::hestList,
+                                     verbose = TRUE, rebuild = TRUE)
+
+identical(hest.model, hest.model2) # c++ codes now different
 
 # simulate data
 
@@ -23,9 +29,9 @@ hsim <- msde::sde.sim(model = hest.model, init.data = Y0,
                       N = N, burn = 0, nreps = 5)
 
 set.seed(1)
-hsim2 <- msde.devel::sde.sim(model = hest.model2, init.data = Y0,
-                             params = theta, dt = dT, dt.sim = dT/100,
-                             N = N, burn = 0, nreps = 5)
+hsim2 <- msde2::sde.sim(model = hest.model2, init.data = Y0,
+                        params = theta, dt = dT, dt.sim = dT/100,
+                        N = N, burn = 0, nreps = 5)
 
 identical(hsim, hsim2)
 
@@ -36,27 +42,46 @@ k <- 1
 par.index <- 1
 init <- msde::sde.init(data = hsim$data[1,,], dt = dT, k = k,
                        par.index = par.index, params = theta)
-init2 <- msde.devel::sde.init(data = hsim2$data[1,,], dt = dT, k = k,
-                              par.index = par.index, params = theta)
+init2 <- msde2::sde.init(data = hsim2$data[1,,], dt = dT, k = k,
+                         par.index = par.index, params = theta)
 
 
 identical(init, init2)
 
-nsamples <- 100
+nsamples <- 5e4
 burn <- 10
 rw.jump.sd <- rep(.1, 6)
 
 set.seed(1)
-hpost <- msde::sde.post(model = hest.model, init = init,
-                        nsamples = nsamples, burn = burn,
-                        data.out.ind = nsamples, rw.jump.sd = rw.jump.sd,
-                        prior = NULL)
+RNGkind(normal.kind="Inversion")
+system.time({
+  hpost <- msde::sde.post(model = hest.model, init = init,
+                          nsamples = nsamples, burn = burn,
+                          data.out.ind = nsamples, rw.jump.sd = rw.jump.sd,
+                          prior = NULL)
+})
 
 set.seed(1)
-hpost2 <- msde.devel::sde.post(model = hest.model2, init = init2,
-                               nsamples = nsamples, burn = burn,
-                               data.out.ind = nsamples,
-                               rw.jump.sd = rw.jump.sd,
-                               prior = NULL)
+RNGkind(normal.kind="Box-Muller")
+system.time({
+  hpost2 <- msde2::sde.post(model = hest.model2, init = init2,
+                            nsamples = nsamples, burn = burn,
+                            data.out.ind = nsamples,
+                            rw.jump.sd = rw.jump.sd,
+                            prior = NULL)
+})
 
 identical(hpost, hpost2)
+
+#--- just look at RNG speed -----------------------------------------------------
+
+RNGkind(normal.kind="Inversion")
+system.time({
+  rnorm(1e7)
+})
+
+# slower for me...
+RNGkind(normal.kind="Box-Muller")
+system.time({
+  rnorm(1e7)
+})
