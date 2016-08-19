@@ -53,7 +53,6 @@ burn <- 10
 rw.jump.sd <- rep(.1, 6)
 
 set.seed(1)
-RNGkind(normal.kind="Inversion")
 system.time({
   hpost <- msde::sde.post(model = hest.model, init = init,
                           nsamples = nsamples, burn = burn,
@@ -62,7 +61,6 @@ system.time({
 })
 
 set.seed(1)
-RNGkind(normal.kind="Box-Muller")
 system.time({
   hpost2 <- msde2::sde.post(model = hest.model2, init = init2,
                             nsamples = nsamples, burn = burn,
